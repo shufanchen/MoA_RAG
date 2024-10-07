@@ -16,10 +16,14 @@ MoA_Rag is a framework that combines a mixture of agents (MoA) with Retrieval-Au
     - Customizes prompts for each layer.
 - **make_index.py**: 
     - Builds the knowledge vector database for efficient retrieval.
+- **retrieve.py**: 
+    - Contains functions for executing the retrieval process.
+    - Returns relevant chunks and their corresponding `chunks_id`.
 - **evaluation.py**: 
     - Calculates 7 metrics specific to RAGAS.
 - **evaluation_local.py**: 
     - Computes 4 traditional evaluation metrics.
 - **eval_retrieve.py**: 
     - Evaluates retrieval performance using metrics like MRR and hit rate.
+  
 
