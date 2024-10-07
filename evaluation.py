@@ -10,8 +10,8 @@ import datetime
 import warnings
 # 忽略警告
 warnings.filterwarnings('ignore')
-os.environ['OPENAI_API_KEY'] = 'sk-iBPKKjivWouQB7uL3781E2AbB6B94608B5Ff96Cc1aD64578'
-os.environ['OPENAI_API_BASE'] = "https://api.xty.app/v1"
+os.environ['OPENAI_API_KEY'] = ''
+os.environ['OPENAI_API_BASE'] = ""
 
 
 langchain_llm = ChatOpenAI(model_name="gpt-3.5-turbo")
