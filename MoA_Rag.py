@@ -352,7 +352,7 @@ async def process_jsonl(file_path, max_lines=None, begin_lines=0):
 #
 # Usage Example:
 if __name__ == "__main__":
-    api_key = "127ceb779df0d5afb013ee49a2e2ddd2b27f22b3ba931e4ff40066aa06b15ba9"
+    api_key = "" #改成你的together ai的API
     # temperature_layers= [0.7,0.8,0.6]
     temperature_layers = [0, 0, 0]  # 元素个数一定要和layers参数大小相吻合
     aggregator_model = "microsoft/WizardLM-2-8x22B"
