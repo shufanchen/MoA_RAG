@@ -29,7 +29,7 @@ MoA_Rag is a framework which combines a mixture of agents (MoA) with Retrieval-A
 If you find this framework helpful, please consider citing our paper:
 
 ```bibtex
-@misc{ren2025ra-moa,
+@misc{
       title={Retrieval-Augmented Mixture-of-Agents (RA-MOA): Two heads are better than one}, 
       year={2024},
       conference={NAACL},
