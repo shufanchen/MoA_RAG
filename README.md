@@ -1,6 +1,6 @@
 # MoA_RAG
 MoA_Rag is a framework that combines a mixture of agents (MoA) with Retrieval-Augmented Generation (RAG).
-
+![Framework](framework.png)
 ## Folder Structure
 - **dataset**: Contains raw data files, including JSONL-formatted QA pairs and index files for each dataset.
 - **model**: Stores the embedding models used for retrieval.
