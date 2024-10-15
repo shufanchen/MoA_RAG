@@ -25,9 +25,6 @@ MoA_Rag is a framework jointly proposed by **Shufan Chen** (University of Scienc
     - Computes 4 traditional evaluation metrics.
 - **eval_retrieve.py**: 
     - Evaluates retrieval performance using metrics like MRR and hit rate.
-## Authors and Contributions
-- **Shufan Chen** (University of Science and Technology of China): Responsible for project engineering, including code implementation and repository structure.
-- **Runtao Ren** (City University of Hong Kong): Responsible for proposing the project idea, refining the framework, and drafting the associated research paper.
 ## Citation
 If you find this framework helpful, please consider citing our paper:
 
