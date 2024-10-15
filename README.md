@@ -1,5 +1,5 @@
 # MoA_RAG
-MoA_Rag is a framework jointly proposed by **Shufan Chen** (University of Science and Technology of China) and **Runtao Ren** (City University of Hong Kong). This framework combines a mixture of agents (MoA) with Retrieval-Augmented Generation (RAG) to achieve enhanced performance in information retrieval and generation tasks.
+MoA_Rag is a framework which combines a mixture of agents (MoA) with Retrieval-Augmented Generation (RAG) to achieve enhanced performance in information retrieval and generation tasks.
 ![Framework](framework.png)
 ## Folder Structure
 - **dataset**: Contains raw data files, including JSONL-formatted QA pairs and index files for each dataset.
