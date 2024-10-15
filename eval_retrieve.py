@@ -80,23 +80,39 @@ def compute_mrr_and_hit_rate(source_file_path: str, rag_result_file_path: str, k
     return avg_mrr, avg_hit_rate
 
 
-def process_jsonl_and_retrieve(input_jsonl, persist_dir, embed_model_name, top_k=1):
+def process_jsonl_and_retrieve(input_jsonl, persist_dir, embed_model_name, top_k=1, start_line=0, max_lines=None):
     # Generate output file path based on input file name
     base_name = os.path.basename(input_jsonl)
     file_name, _ = os.path.splitext(base_name)
     output_dir = './retrieval_results/'
     os.makedirs(output_dir, exist_ok=True)
     output_jsonl = os.path.join(output_dir, f"{file_name}_top{top_k}_retrieval.jsonl")
+
     try:
-        embed_model = OptimumEmbedding(folder_name="./model/"+embed_model_name,device="coda:0")
+        embed_model = OptimumEmbedding(folder_name="./model/"+embed_model_name)
     except:
-        embed_model = HuggingFaceEmbedding(model_name=embed_model_name,device="coda:0")
-    # Count total lines for progress bar
+        embed_model = HuggingFaceEmbedding(model_name=embed_model_name)
+
+    # Count total lines
     with open(input_jsonl, 'r', encoding='utf-8') as infile:
         total_lines = sum(1 for _ in infile)
 
-    with open(input_jsonl, 'r', encoding='utf-8') as infile, open(output_jsonl, 'w', encoding='utf-8') as outfile:
-        for line in tqdm(infile, total=total_lines, desc="Processing", unit="line"):
+    # Calculate how many lines we are going to process based on start_line and max_lines
+    if max_lines is not None:
+        total_to_process = min(total_lines - start_line, max_lines)
+    else:
+        total_to_process = total_lines - start_line
+
+    if total_to_process <= 0:
+        raise ValueError("Invalid start_line or max_lines: no lines to process.")
+
+    with open(input_jsonl, 'r', encoding='utf-8') as infile, open(output_jsonl, 'a', encoding='utf-8') as outfile:
+        for current_line, line in enumerate(tqdm(infile, total=total_to_process, desc="Processing", unit="line")):
+            if current_line < start_line:
+                continue
+            if current_line >= start_line + total_to_process:
+                break
+
             sample = json.loads(line.strip())
 
             # Retrieve chunks based on question
@@ -113,22 +129,25 @@ def process_jsonl_and_retrieve(input_jsonl, persist_dir, embed_model_name, top_k
 
     print(f"Retrieval results saved to: {output_jsonl}")
     return output_jsonl
+
 # Usage Example:
 if __name__ == "__main__":
 # 使用示例
-    #source_file_path = './dataset/tech_QA/tech_ragas_bge-base-en-v1.5_add_id.jsonl'
+    source_file_path = './dataset/tech_QA/tech_ragas_bge-base-en-v1.5_add_id.jsonl'
     #source_file_path = './dataset/ragas-wiki/wiki_ragas_bge-base-en-v1.5_add_id.jsonl'
-    source_file_path = './dataset/ragas-wiki/wiki_ragasbge-small-en-v1.5_add_id.jsonl'
+    #source_file_path = './dataset/ragas-wiki/wiki_ragasbge-small-en-v1.5_add_id.jsonl'
     #source_file_path ='./dataset/ragas-wiki/wiki_ragas_bge-large-en-v1.5_add_id.jsonl'
-    source_file_path = './dataset/tech_QA/tech_ragas_add_id.jsonl'
-    index_dir = './dataset/tech_index_bge-small-en-v1.5'
+    #source_file_path = './dataset/tech_QA/tech_ragas_add_id.jsonl'
+    #source_file_path = './dataset/RGB_QA/RGB_ragas_bge-large-en-v1.5_add_id.jsonl'
+    index_dir = './dataset/tech_index_bge-base-en-v1.5'
     #index_dir = './dataset/wiki_index_bge-small-en-v1.5'
     #index_dir = './dataset/wiki_index_bge-large-en-v1.5'
+    #index_dir = './dataset/RGB_index_bge-large-en-v1.5'
 
-    #index_dir = './dataset/wiki_index_jina-embeddings-v2-small-en'
-    embedding = "BAAI/bge-small-en-v1.5"
+#index_dir = './dataset/wiki_index_jina-embeddings-v2-small-en'
+    embedding = "BAAI/bge-base-en-v1.5"
     #embedding = "jinaai/jina-embeddings-v2-small-en"
-    save_path = process_jsonl_and_retrieve(source_file_path,index_dir,embedding,top_k=1)
+    save_path = process_jsonl_and_retrieve(source_file_path,index_dir,embedding,top_k=1,start_line=556)
     #save_path = "./retrieval_results/wiki_ragas_add_id_retrieval.jsonl"
     print(compute_mrr_and_hit_rate(source_file_path,save_path))
 

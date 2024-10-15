@@ -4,31 +4,45 @@ from llama_index.embeddings.huggingface_optimum import OptimumEmbedding
 import asyncio
 import together
 from together import AsyncTogether, Together
-#from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+# from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from retrieve import retrieve_chunks  # 直接调用已经写好的retrieve_chunks
 import os
 import json
 from tqdm import tqdm
 from evaluation import process_all_jsonl_files
-#from eval_retrieve import compute_mrr_and_hit_rate
+# from eval_retrieve import compute_mrr_and_hit_rate
 from aiohttp import ClientError
 from datetime import datetime
+from langchain.chat_models import ChatOpenAI
 import csv
-ccc=1
-c = 1
+from openai import OpenAI
+
+os.environ['OPENAI_API_KEY'] = 'sk-iBPKKjivWouQB7uL3781E2AbB6B94608B5Ff96Cc1aD64578'
+os.environ['OPENAI_API_BASE'] = "https://api.xty.app/v1"
+
 
 class MOA_RAG:
     def __init__(self, api_key, embed_model_names=["BAAI/bge-small-en-v1.5"],
                  aggregator_model="mistralai/Mixtral-8x22B-Instruct-v0.1",
                  top_k=1, layers=2, max_tokens=512, temperature=[0.7, 0.8],
-                 index_dirs=["./dataset/tech_index_bge-small-en-v1.5"]):
+                 index_dirs=["./dataset/tech_index_bge-small-en-v1.5"], is_openai=False):
         self.client = Together(api_key=api_key)
+        if is_openai:
+            self.openai_client = OpenAI(
+                # This is the default and can be omitted
+                api_key=os.environ.get("OPENAI_API_KEY"),
+                base_url=os.environ.get("OPENAI_API_BASE")
+            )
+        else:
+            self.openai_client = []
+
         self.async_client = AsyncTogether(api_key=api_key)
         self.persist_dirs = index_dirs
-        #self.embed_model = HuggingFaceEmbedding(model_name=embed_model_name)
-        #self.embed_model = OptimumEmbedding(folder_name="./model/" + embed_model_name)
+        # self.embed_model = HuggingFaceEmbedding(model_name=embed_model_name)
+        # self.embed_model = OptimumEmbedding(folder_name="./model/" + embed_model_name)
         self.embed_model_names = embed_model_names
-        self.embed_models = [OptimumEmbedding(folder_name="./model/" + model_name) for model_name in self.embed_model_names]
+        self.embed_models = [OptimumEmbedding(folder_name="./model/" + model_name) for model_name in
+                             self.embed_model_names]
 
         # try:
         #     self.embed_model = OptimumEmbedding(folder_name="./model/" + embed_model_name)
@@ -40,24 +54,35 @@ class MOA_RAG:
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.reference_models = [
+            "gpt-3.5-turbo",
+            "gpt-3.5-turbo",
+            "gpt-3.5-turbo"
             # "meta-llama/Meta-Llama-3-8B-Instruct-Lite",
             # "meta-llama/Llama-3.2-3B-Instruct-Turbo",
             # "Gryphe/MythoMax-L2-13b-Lite",
-            "google/gemma-2-9b-it",
-            "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-            "mistralai/Mistral-7B-Instruct-v0.3",
+            # "meta-llama/Llama-3.2-3B-Instruct-Turbo",
+            # "meta-llama/Llama-3.2-3B-Instruct-Turbo",
+            # "meta-llama/Llama-3.2-3B-Instruct-Turbo",
+            # "google/gemma-2-9b-it",
+            # "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+            # "mistralai/Mistral-7B-Instruct-v0.3",
             # "Qwen/Qwen2-72B-Instruct",
-            # 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo',
+            #'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo',
+            # 'deepseek-ai/deepseek-llm-67b-chat',
+            # 'deepseek-ai/deepseek-llm-67b-chat',
             # 'deepseek-ai/deepseek-llm-67b-chat',
             # "mistralai/Mixtral-8x22B-Instruct-v0.1",
             # "databricks/dbrx-instruct",
         ]
+        # self.judge_model = "gpt-3.5-turbo"
         self.judge_model = "Gryphe/MythoMax-L2-13b-Lite"
-        #self.judge_model = "Qwen/Qwen1.5-72B-Chat"
+        # self.judge_model = "meta-llama/Meta-Llama-3-8B-Instruct-Lite"
+        # self.judge_model = "meta-llama/Llama-3.2-3B-Instruct-Turbo"
+        # self.judge_model = "Qwen/Qwen1.5-72B-Chat"
         self.timestamp_save = None
         self.baselines_base_path = None
         self.final_base_path = None
-        self.first_system_prompt = """You are an expert with advanced comprehension skills. Please answer the query based on the provided contexts. Ensure your answer is accurate and directly addresses the query."""
+        self.first_system_prompt = """You are an expert with advanced comprehension skills. Please answer the query based on the provided contexts. Ensure provide the most comprehensive analysis and answer based on your knowledge"""
         # self.judger_system_prompt = """
         # You are a professional judge tasked with evaluating a single response based on the query, context, and that specific model's answer.
         # First, determine whether the context is strongly related to the query. If it is, consider the context, query, and the response in your analysis; otherwise, base your judgment solely on the query and the response.
@@ -67,13 +92,20 @@ class MOA_RAG:
         # """
         self.judger_system_prompt = """You are a professional answer reviewer. Evaluate whether the answer appropriately uses the context to respond to the question. Consider:
         1. **Relevance**: Does the answer address the question using the context?
-        2. **Accuracy**: Is the information correct based on the context?
+        2. **Accuracy**: Does the context corresponding to this inquiry correct?
         3. **Completeness**: Does the answer cover all key points of the question?
-        Provide your reasoning briefly, then make a clear decision: state either "Decision: Accept" or "Decision: Reject".
+        Think step by step to evaluate the quality of the response in the above three aspects and make a clear decision: state either "Decision: Accept" or "Decision: Reject".
         """
 
-        self.aggregator_system_prompt = """You have been provided with a set of responses from various open-source models to the latest user query. Your task is to synthesize these responses into a single, high-quality response. It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect. Your response should not simply replicate the given answers but should offer a refined, accurate, and comprehensive reply to the instruction. Ensure your response is well-structured, coherent, and adheres to the highest standards of accuracy and reliability.
-"""
+        # self.aggregator_system_prompt = """You have been provided with a set of responses from various open-source models to the latest user query. Your task is to synthesize these responses into a single, high-quality response. It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect. Your response should not simply replicate the given answers but should offer a refined, accurate, and comprehensive reply to the instruction. Ensure your response is well-structured, coherent, and adheres to the highest standards of accuracy and reliability.
+        #
+        # """
+        self.aggregator_system_prompt = """
+        You have been provided with a set of responses from various open-source models to the latest user query.   
+        Think step by step and synthesize these responses into a single, high-quality response. Remember to avoid including statements irrelevant to the query.
+        It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect. 
+        Ensure your response is coherent and adheres to the highest standards of accuracy and reliability. 
+        """
         # self.aggregator_system_prompt = """
         # # You have been provided with a question, materials, and various model responses, all of which aim to address the given question. Your task is to synthesize a single, high-quality response by following these principles:
         # #
@@ -82,6 +114,7 @@ class MOA_RAG:
         # # 3. For accurate responses that emphasize different perspectives, extract and integrate the most insightful and relevant elements from each. Prioritize synthesizing content that not only correctly answers the question but also provides depth and completeness to the final response.
         # # 4. Craft a final response that is coherent, comprehensive, and directly addresses the question. This response should refine and elevate the initial inputs, ensuring a balanced, accurate, and thorough answer that covers all critical aspects of the query.
         # # """
+
     async def close(self):
         await self.async_client.session.close()
 
@@ -92,7 +125,7 @@ class MOA_RAG:
                 # 将每个prev_response标记为对应模型的名字和顺序
                 return f"""
                     Query: {question}
-                    Contexts: {materials}
+                    Context: {materials}
                     Response to be judged:
                     {prev_response[0]}
                     """
@@ -110,29 +143,29 @@ class MOA_RAG:
                         responses_with_model_names.append(f"{i + 1}. [{self.reference_models[i]}]: {response}")
 
                 responses_with_model_names = "\n".join(responses_with_model_names)
-                return f"""
-                    Query: {question}
-                    Contexts: {materials}
-                    Responses from previous models:
-                    {responses_with_model_names}
-                    """
+                if materials!='None':
+                    return f"""
+                        Query: {question}
+                        Context: {materials}
+                        Responses from previous models:
+                        {responses_with_model_names}
+                        """
+                else:
+                    return f"""
+                        Query: {question}
+                        Responses from previous models:
+                        {responses_with_model_names}
+                        """
         else:
             return f"""
                 Query: {question}
-                Contexts: {materials}
+                Context: {materials}
                 """
 
-    def construct_user_prompt_old(self, materials, question):
-        """Construct the user prompt for the LLM model."""
-        return f"""
-        Question:{question}
-        Materials:{materials}
-        You are an expert with advanced comprehension skills. Carefully analyze the provided materials and the query, and assess the relevance of each part of the material to the query. If the material provides relevant information, incorporate it into your response. If not, draw upon your own knowledge to address the question. Ensure your answer is accurate and directly addresses the query.
-        """
 
     async def run_llm(self, model, question, context, proposer_response=None, temperature_cur=0.7):
         """Run a single LLM call with a model while accounting for previous responses and rate limits."""
-        for sleep_time in [1, 2, 4, 8,16]:
+        for sleep_time in [1, 2, 4, 8, 16]:
             try:
                 if proposer_response:
                     model_index = self.reference_models.index(model)
@@ -150,6 +183,38 @@ class MOA_RAG:
                     messages = ([{"role": "system", "content": self.first_system_prompt},
                                  {"role": "user", "content": self.construct_user_prompt(context, question)}])
                 response = await self.async_client.chat.completions.create(
+                    model=self.judge_model if proposer_response else model,
+                    messages=messages,
+                    temperature=temperature_cur,
+                    max_tokens=self.max_tokens,
+                )
+                print("Model: ", self.judge_model if proposer_response else model)
+                break
+            except (together.error.RateLimitError, ClientError) as e:
+                print(e)
+                await asyncio.sleep(sleep_time)
+        return response.choices[0].message.content
+
+    async def run_llm_openai(self, model, question, context, proposer_response=None, temperature_cur=0.7):
+        """Run a single LLM call with a model while accounting for previous responses and rate limits."""
+        for sleep_time in [1, 2, 4, 8, 16]:
+            try:
+                if proposer_response:
+                    model_index = self.reference_models.index(model)
+                    current_proposer_response = [proposer_response[model_index]]
+                    messages = (
+                        [
+                            {
+                                "role": "system",
+                                "content": self.judger_system_prompt
+                            },
+                            {"role": "user",
+                             "content": self.construct_user_prompt(context, question, current_proposer_response)},
+                        ])
+                else:
+                    messages = ([{"role": "system", "content": self.first_system_prompt},
+                                 {"role": "user", "content": self.construct_user_prompt(context, question)}])
+                response = self.openai_client.chat.completions.create(
                     model=self.judge_model if proposer_response else model,
                     messages=messages,
                     temperature=temperature_cur,
@@ -181,7 +246,8 @@ class MOA_RAG:
             # Store baseline results for each model
             model_name = [ref_model.split("/")[-1] for ref_model in self.reference_models]
             for i, result in enumerate(answer):
-                save_baseline_path = os.path.join(base_path, f"{model_name[i]}_{self.embed_model_names[i].split('/')[-1]}_output.jsonl")
+                save_baseline_path = os.path.join(base_path,
+                                                  f"{model_name[i]}_{self.embed_model_names[i].split('/')[-1]}_output.jsonl")
                 if self.baselines_base_path == None:
                     self.baselines_base_path = base_path
                 entry = {
@@ -190,14 +256,15 @@ class MOA_RAG:
                     "context": context[i],
                     "ground_truth": ground_truth,
                     "chunks_id": chunks_id[i],
-                    "retrieval_model":self.embed_model_names[i].split('/')[-1]
+                    "retrieval_model": self.embed_model_names[i].split('/')[-1]
                 }
                 with open(save_baseline_path, "a") as f:
                     f.write(json.dumps(entry) + "\n")  # Append each model's output in JSONL format
         elif is_judge:
             model_name = [ref_model.split("/")[-1] for ref_model in self.reference_models]
             for i, result in enumerate(answer):
-                save_judge_path = os.path.join(base_path, f"{model_name[i]}_judge.csv")
+                save_judge_path = os.path.join(base_path,
+                                               f"{model_name[i]}_{self.embed_model_names[i].split('/')[-1]}_judge.csv")
                 if self.baselines_base_path is None:
                     self.baselines_base_path = base_path
 
@@ -253,58 +320,66 @@ class MOA_RAG:
             all_chunks_ids.append(chunks_id)
 
         # 产生第一层proposers的输出
-        results = await asyncio.gather(
-            *[self.run_llm(model, question, material, temperature_cur=self.temperature[0])
-              for model, material in zip(self.reference_models, all_materials)]
-        )
+        if self.openai_client:
+            results = await asyncio.gather(
+                *[self.run_llm_openai(model, question, material, temperature_cur=self.temperature[0])
+                  for model, material in zip(self.reference_models, all_materials)]
+            )
+        else:
+            results = await asyncio.gather(
+                *[self.run_llm(model, question, material, temperature_cur=self.temperature[0])
+                  for model, material in zip(self.reference_models, all_materials)]
+            )
 
         self.store_generated_content(question, results, all_materials, is_final=False, temp=self.temperature[0],
                                      ground_truth=ground_truth, chunks_id=all_chunks_ids)
 
         # 第二层判决层对第一层的输出进行判决
-        judge_comments = []
-        for _ in range(1, self.layers - 1):
-            judge_comments = await asyncio.gather(
-                *[self.run_llm(model, question, material, proposer_response=results,
-                               temperature_cur=self.temperature[_])
-                  for model, material in zip(self.reference_models, all_materials)]
-            )
-
-
-        self.store_generated_content(question, judge_comments, all_materials, is_final=False, temp=self.temperature[_],
-                                     ground_truth=ground_truth, chunks_id=all_chunks_ids, is_judge=True)
-        select_results = []
-        select_materials = []
-        for i, comment in enumerate(judge_comments):
-            if "Decision: Accept" in comment:
-                select_results.append(results[i])
-                if all_materials[i] not in select_materials:#对重复的context不予以加入
-                    select_materials.append(all_materials[i])
-            elif "Decision: Reject" in comment:
-                select_results.append(f"Decision: Reject.{results[i]}")
-            else:  # 这里留下用语义向量嵌入判断正向还是负向的选择
-                select_results.append(results[i])
-
-        # Run the final aggregation model
-        final_materials = "\n".join([f"{i+1}. {material}" for i, material in enumerate(select_materials)])
-
-        final_response = self.client.chat.completions.create(
-            model=self.aggregator_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self.aggregator_system_prompt
-                },
-                {"role": "user", "content": self.construct_user_prompt(final_materials, question, select_results)},
-            ],
-            stream=False,
-            temperature=self.temperature[-1]
-        )
-        self.store_generated_content(question, final_response.choices[0].message.content, final_materials, is_final=True,
-                                     temp=self.temperature[-1], ground_truth=ground_truth, chunks_id=all_chunks_ids,
-                                     prev_results=select_results)
-
-        return final_response.choices[0].message.content
+        # judge_comments = []
+        # for _ in range(1, self.layers - 1):
+        #     judge_comments = await asyncio.gather(
+        #         *[self.run_llm(model, question, material, proposer_response=results,
+        #                        temperature_cur=self.temperature[_])
+        #           for model, material in zip(self.reference_models, all_materials)]
+        #     )
+        #
+        # self.store_generated_content(question, judge_comments, all_materials, is_final=False, temp=self.temperature[_],
+        #                              ground_truth=ground_truth, chunks_id=all_chunks_ids, is_judge=True)
+        #select_results = []
+        #select_results = results
+        # select_materials = []
+        # for i, comment in enumerate(judge_comments):
+        #     if "Decision: Accept" in comment:
+        #         select_results.append(results[i])
+        #         if all_materials[i] not in select_materials:  # 对重复的context不予以加入
+        #             select_materials.append(all_materials[i])
+        #     elif "Decision: Reject" in comment:
+        #         continue
+        #         # select_results.append(f"Decision: Reject.{results[i]}")
+        #     else:  # 这里留下用语义向量嵌入判断正向还是负向的选择
+        #         select_results.append(results[i])
+        #
+        # # Run the final aggregation model
+        # #final_materials = "\n".join([f"{i + 1}. {material}" for i, material in enumerate(select_materials)])
+        # final_materials = 'None'
+        # final_response = self.client.chat.completions.create(
+        #     model=self.aggregator_model,
+        #     messages=[
+        #         {
+        #             "role": "system",
+        #             "content": self.aggregator_system_prompt
+        #         },
+        #         {"role": "user", "content": self.construct_user_prompt(final_materials, question, select_results)},
+        #     ],
+        #     stream=False,
+        #     temperature=self.temperature[-1]
+        # )
+        # self.store_generated_content(question, final_response.choices[0].message.content, final_materials,
+        #                              is_final=True,
+        #                              temp=self.temperature[-1], ground_truth=ground_truth, chunks_id=all_chunks_ids,
+        #                              prev_results=select_results)
+        #
+        # return final_response.choices[0].message.content
 
 
 # Define a function to process each record in the jsonl file
@@ -352,24 +427,33 @@ async def process_jsonl(file_path, max_lines=None, begin_lines=0):
 #
 # Usage Example:
 if __name__ == "__main__":
-    api_key = "" #改成你的together ai的API
+    api_key = "127ceb779df0d5afb013ee49a2e2ddd2b27f22b3ba931e4ff40066aa06b15ba9"
     # temperature_layers= [0.7,0.8,0.6]
     temperature_layers = [0, 0, 0]  # 元素个数一定要和layers参数大小相吻合
-    aggregator_model = "microsoft/WizardLM-2-8x22B"
+    # aggregator_model = "microsoft/WizardLM-2-8x22B"
     aggregator_model = 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo'
+    # aggregator_model = "meta-llama/Llama-3.2-3B-Instruct-Turbo"
+    # aggregator_model = "gpt-3.5-turbo"
     #aggregator_model = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
-    #aggregator_model = "mistralai/Mixtral-8x22B-Instruct-v0.1"
-    embed_model = ["BAAI/bge-small-en-v1.5","BAAI/bge-base-en-v1.5","BAAI/bge-large-en-v1.5"]
+    # aggregator_model = "mistralai/Mixtral-8x22B-Instruct-v0.1"
+    embed_model = ["BAAI/bge-small-en-v1.5", "BAAI/bge-base-en-v1.5", "BAAI/bge-large-en-v1.5"]
     # embed_model = 'thenlper/gte-small'
     # embed_model = 'yco/bilingual-embedding-base'
-    index_dirs = ['./dataset/tech_index_bge-small-en-v1.5','./dataset/tech_index_bge-base-en-v1.5','./dataset/tech_index_bge-large-en-v1.5']
+    index_dirs = ['./dataset/tech_index_bge-small-en-v1.5', './dataset/tech_index_bge-base-en-v1.5',
+                   './dataset/tech_index_bge-large-en-v1.5']
+    #index_dirs = ['./dataset/wiki_index_bge-small-en-v1.5','./dataset/wiki_index_bge-base-en-v1.5','./dataset/wiki_index_bge-large-en-v1.5']
+    # index_dirs = ['./dataset/RGB_index_bge-small-en-v1.5','./dataset/RGB_index_bge-base-en-v1.5','./dataset/RGB_index_bge-large-en-v1.5']
+    # index_dirs = ['./dataset/covid_index_bge-small-en-v1.5', './dataset/covid_index_bge-base-en-v1.5',
+    #               './dataset/covid_index_bge-large-en-v1.5']
     # index_dir = './dataset/wiki_index_bge-small-en-v1.5'
     # index_dir = './dataset/TAT_index_bge-small-en-v1.5'
 
-    moa_rag = MOA_RAG(api_key=api_key, layers=3, embed_model_names=embed_model,top_k=1, max_tokens=512, temperature=temperature_layers,
+    moa_rag = MOA_RAG(api_key=api_key, layers=3, embed_model_names=embed_model, top_k=1, max_tokens=512,
+                      temperature=temperature_layers,
                       index_dirs=index_dirs,
-                      aggregator_model=aggregator_model)
-    # moa_rag.timestamp_save='2024-09-30 16_12_03'
+                      aggregator_model=aggregator_model,
+                      is_openai=True)
+    #moa_rag.timestamp_save = '2024-10-12 19_51_33'
     if moa_rag.timestamp_save == None:
         now = datetime.now()
         timestamp = datetime.timestamp(now)
@@ -378,17 +462,20 @@ if __name__ == "__main__":
     eval_after = True
 
     # Set the maximum number of lines to read
-    max_lines_to_read = 10  # Replace this with the number of lines you want to read
-    # source_path = './dataset/ragas-wiki/wiki_ragas_add_id.jsonl'
+    max_lines_to_read = 200  # Replace this with the number of lines you want to read
+    #source_path = './dataset/ragas-wiki/wiki_ragas_add_id.jsonl'
     source_path = './dataset/tech_QA/tech_ragas_bge-large-en-v1.5_add_id.jsonl'
-    # source_path = './dataset/TAT_QA/TAT_ragas_add_id.jsonl'
+    # source_path = './dataset/RGB_QA/RGB_ragas_bge-base-en-v1.5_add_id.jsonl'
+    #source_path = './dataset/covid_QA/covid_qa_bge-base-en-v1.5_add_id.jsonl'
+
     # Run the processing function for the jsonl file
     begin_lines = 0
     asyncio.run(process_jsonl(source_path, max_lines=max_lines_to_read, begin_lines=begin_lines))
     # evlaution after running
     moa_rag.close()
     if eval_after:
-        process_all_jsonl_files(moa_rag.baselines_base_path)
-        process_all_jsonl_files(moa_rag.final_base_path)
+        #process_all_jsonl_files(moa_rag.baselines_base_path,begin_lines,max_lines_to_read)
+        process_all_jsonl_files(moa_rag.baselines_base_path,begin_lines,max_lines_to_read)
+        #process_all_jsonl_files(moa_rag.final_base_path,begin_lines,max_lines_to_read)
         # eval_target_file = moa_rag.final_base_path+'/'+aggregator_model.split('/')[-1].split('-')[0]+'_final_response.jsonl'
         # compute_mrr_and_hit_rate(source_path,eval_target_file)

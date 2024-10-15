@@ -155,6 +155,9 @@ if __name__ == "__main__":
     #file_path = './results/tech_index_bge-small-en-v1.5/MoA_Rag_temp_0.8_topk_1_layers_2_2024-10-02 09_07_26'
     file_path = './results/tech_index_bge-small-en-v1.5/Baselines_temp_0.7_topk_1_layers_2_2024-10-01 17_16_23'
     #file_path = './results/tech_index_bge-small-en-v1.5/MoA_Rag_temp_0.8_topk_1_layers_2_2024-10-01 17_16_23'
+    # file_path = './results/tech/Baselines_temp_0_topk_1_layers_3_2024-10-12 19_51_33'
+    # process_all_jsonl_files(file_path)
+    file_path = './results/tech/MoA_Rag_temp_0_topk_1_layers_3_2024-10-09 13_13_25'
     process_all_jsonl_files(file_path)
 # jsonl_path = './results/wiki_index_bge-small-en-v1.5/MoA_Rag_temp_0.8_topk_1_layers_2_2024-10-01 16_29_21/WizardLM_final_response.jsonl'
 # evaluate_and_save_metrics(jsonl_path)
