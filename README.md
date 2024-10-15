@@ -28,4 +28,15 @@ MoA_Rag is a framework jointly proposed by **Chen Shufan** (University of Scienc
 ## Authors and Contributions
 - **Chen Shufan** (University of Science and Technology of China): Responsible for project engineering, including code implementation and repository structure.
 - **Ren Runtao** (City University of Hong Kong): Responsible for proposing the project idea, refining the framework, and drafting the associated research paper.
+## Citation
+If you find this framework helpful, please consider citing our paper:
+
+```bibtex
+@misc{ren2025ra-moa,
+      title={Retrieval-Augmented Mixture-of-Agents (RA-MOA): Two heads are better than one}, 
+      author={Runtao Ren and Shufan Chen},
+      year={2025},
+      conference={NAACL},
+      primaryClass={cs.AI}
+}
 
