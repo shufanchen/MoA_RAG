@@ -17,8 +17,8 @@ from langchain.chat_models import ChatOpenAI
 import csv
 from openai import OpenAI
 
-os.environ['OPENAI_API_KEY'] = 'sk-iBPKKjivWouQB7uL3781E2AbB6B94608B5Ff96Cc1aD64578'
-os.environ['OPENAI_API_BASE'] = "https://api.xty.app/v1"
+os.environ['OPENAI_API_KEY'] = ''
+os.environ['OPENAI_API_BASE'] = ""
 
 
 class MOA_RAG:

@@ -13,10 +13,10 @@ import warnings
 # 忽略警告
 warnings.filterwarnings('ignore')
 os.environ[
-    'OPENAI_API_KEY'] = 'sk-iBPKKjivWouQB7uL3781E2AbB6B94608B5Ff96Cc1aD64578'
+    'OPENAI_API_KEY'] = ''
 
 
-os.environ['OPENAI_API_BASE'] = "https://api.xty.app/v1"
+os.environ['OPENAI_API_BASE'] = ""
 
 
 def read_jsonl(file_path, begin_lines=0, max_lines_to_read=10):
