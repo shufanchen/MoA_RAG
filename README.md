@@ -31,8 +31,7 @@ If you find this framework helpful, please consider citing our paper:
 ```bibtex
 @misc{ren2025ra-moa,
       title={Retrieval-Augmented Mixture-of-Agents (RA-MOA): Two heads are better than one}, 
-      author={Runtao Ren and Shufan Chen},
-      year={2025},
+      year={2024},
       conference={NAACL},
       primaryClass={cs.AI}
 }
